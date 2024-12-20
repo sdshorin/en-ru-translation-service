@@ -1,0 +1,22 @@
+tokenizer:
+  _target_: src.data.tokenizer.TranslationTokenizer
+  name: "facebook/wmt19-ru-en"
+  max_length: 128
+  padding: "max_length"
+  truncation: true
+
+dataset:
+  _target_: src.data.dataset.TranslationDataset
+  dataset_name: "open_subtitles"
+  lang1: "en"
+  lang2: "ru"
+  max_length: ${data.tokenizer.max_length}
+  train_size: 100000
+
+dataloader:
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  shuffle: true
+  persistent_workers: true
+  prefetch_factor: 2

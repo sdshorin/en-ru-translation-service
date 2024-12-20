@@ -1,0 +1,20 @@
+defaults:
+  - model: seq2seq
+  - data: subtitles
+  - training: default
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: stdout
+  - _self_
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d_%H-%M-%S}
+
+seed: 42
+device: auto  # auto, cuda, cpu
+experiment_name: ${now:%Y-%m-%d_%H-%M-%S}_${model.name}
+
+wandb:
+  project: "translator"
+  username: null  # username
+  mode: online  # disabled, online, offline
