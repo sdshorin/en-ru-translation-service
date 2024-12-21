@@ -1,0 +1,21 @@
+models:
+  tiny:
+    title: "Tiny Seq2Seq"
+    name: "tiny_seq2seq"
+    checkpoint_dir: "tiny_seq2seq"
+    max_length: 32
+    description: "маленькая модель Tiny Seq2Seq"
+  
+  base:
+    title: "Base Seq2Seq"
+    name: "seq2seq"
+    checkpoint_dir: "seq2seq_base"
+    max_length: 128
+    description: "Базовая Seq2Seq. Есть шанс что перевод будет немного осмысленным"
+
+base_ml_config: ../config
+
+server:
+  host: localhost
+  port: 8000
+  reload: true

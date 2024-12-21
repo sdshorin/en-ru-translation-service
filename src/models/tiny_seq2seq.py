@@ -42,7 +42,7 @@ class TinySeq2Seq(nn.Module):
         
         decoder_input = torch.full(
             (batch_size, 1),
-            self.embedding.num_embeddings - 2,
+            self.embedding.num_embeddings - 2,  # Start token
             device=src.device
         )
         
@@ -59,7 +59,7 @@ class TinySeq2Seq(nn.Module):
             else:
                 decoder_input = projection.argmax(2)
             
-            if not self.training and (decoder_input == self.embedding.num_embeddings - 1).all():
+            if not self.training and (decoder_input == self.embedding.num_embeddings - 1).all():  # End token
                 break
                 
         return torch.cat(outputs, dim=1)
@@ -67,4 +67,6 @@ class TinySeq2Seq(nn.Module):
     @torch.no_grad()
     def translate(self, src, max_len=50):
         self.eval()
-        return self(src, max_len=max_len)
+        outputs = self(src, max_len=max_len)
+        token_indices = outputs.argmax(dim=-1)
+        return token_indices
