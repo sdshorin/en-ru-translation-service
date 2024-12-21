@@ -1,7 +1,7 @@
 tokenizer:
   _target_: src.data.tokenizer.TranslationTokenizer
   name: "facebook/wmt19-ru-en"
-  max_length: 128
+  max_length: 32
   padding: "max_length"
   truncation: true
 
@@ -11,7 +11,7 @@ dataset:
   lang1: "en"
   lang2: "ru"
   max_length: ${data.tokenizer.max_length}
-  train_size: 100000
+  train_size: 9000
 
 dataloader:
   batch_size: 256

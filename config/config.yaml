@@ -18,3 +18,4 @@ wandb:
   project: "translator"
   username: null  # username
   mode: online  # disabled, online, offline
+  log_batches: False
