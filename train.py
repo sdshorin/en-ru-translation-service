@@ -61,18 +61,25 @@ def main(config: DictConfig):
     
     initialize_wandb(config)
     
-    model = instantiate(config.model.seq2seq).to(device)
+    model = instantiate(config.model.model_info).to(device)
     log.info(f"Created model: {model.__class__.__name__}")
     
     criterion = torch.nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
     optimizer = instantiate(config.training.optimizer, params=model.parameters())
     
     scheduler = None
+    scheduler_steps_parameter = {config.training.scheduler_steps_parameter : len(train_loader) * config.training.num_epochs}
+    print(scheduler_steps_parameter)
+    
     if "scheduler" in config.training:
         scheduler = instantiate(
             config.training.scheduler,
             optimizer=optimizer,
-            total_steps=len(train_loader) * config.training.num_epochs
+            **scheduler_steps_parameter,
+            # optimizer=optimizer,
+            # total_steps=len(train_loader) * config.training.num_epochs
+            # num_training_steps=
+            
         )
     
     trainer = Trainer(

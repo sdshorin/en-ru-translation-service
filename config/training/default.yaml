@@ -9,6 +9,8 @@ optimizer:
   eps: 1e-8
   betas: [0.9, 0.999]
 
+
+scheduler_steps_parameter: total_steps
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
   max_lr: 0.005

@@ -3,7 +3,7 @@ name: tiny_seq2seq
 pad_token_id: null
 vocab_size: null
 
-seq2seq:
+model_info:
   _target_: src.models.tiny_seq2seq.TinySeq2Seq
   vocab_size: ${model.vocab_size}  # Will be set from tokenizer
   embedding_dim: 64

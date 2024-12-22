@@ -9,8 +9,8 @@ rsync -avz \
 --compress-level=9 \
 --progress \
 -e "ssh -F $SSH_CONFIG" \
---exclude 'dataset' \
---exclude 'venv' \
+--exclude 'outputs' \
+--exclude '.env' \
 --exclude '__pycache__' \
 --exclude '*.pyc' \
 --exclude '.git' \

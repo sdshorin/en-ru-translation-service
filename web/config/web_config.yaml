@@ -12,6 +12,13 @@ models:
     checkpoint_dir: "seq2seq_base"
     max_length: 128
     description: "Базовая Seq2Seq. Есть шанс что перевод будет немного осмысленным"
+  
+  transformer:
+    title: "transformer"
+    name: "transformer"
+    checkpoint_dir: "transformer"
+    max_length: 64
+    description: "Трансформер"
 
 base_ml_config: ../config
 

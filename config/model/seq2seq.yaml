@@ -19,9 +19,8 @@ decoder:
   hidden_dim: 1024
   num_layers: 2
   dropout: 0.1
-  attention: true
 
-seq2seq:
+model_info:
   _target_: src.models.seq2seq.Seq2Seq
   encoder: ${model.encoder}
   decoder: ${model.decoder}

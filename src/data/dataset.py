@@ -27,6 +27,7 @@ class TranslationDataset(Dataset):
         log.info(f"Loading {dataset_name} dataset...")
         self.dataset = datasets.load_dataset(
             dataset_name,
+            trust_remote_code=True,
             lang1=lang1,
             lang2=lang2,
             split=split
@@ -50,18 +51,20 @@ class TranslationDataset(Dataset):
         source_text = item["translation"][self.source_col]
         target_text = item["translation"][self.target_col]
         
+        # print(f"source_text: {source_text}")
         source_encoding = self.tokenizer.encode(
             source_text,
             add_special_tokens=True,
             return_tensors="pt"
         )
         
+        # print(f"target_text: {target_text}")
         target_encoding = self.tokenizer.encode(
             target_text,
             add_special_tokens=True,
             return_tensors="pt"
         )
-        
+        # exit()
         return (
             source_encoding["input_ids"].squeeze(),
             target_encoding["input_ids"].squeeze()

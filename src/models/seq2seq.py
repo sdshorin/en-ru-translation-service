@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from .encoder import Encoder
 from .decoder import Decoder
 
-
 class Seq2Seq(nn.Module):
     def __init__(
         self,
@@ -17,7 +16,6 @@ class Seq2Seq(nn.Module):
         teacher_forcing_ratio: float = 0.5,
         pad_token_id: int = 0
     ):
-        
         super().__init__()
         
         self.encoder = encoder
@@ -31,7 +29,6 @@ class Seq2Seq(nn.Module):
         tgt: Optional[torch.Tensor] = None,
         max_len: Optional[int] = None
     ) -> torch.Tensor:
-        
         batch_size = src.size(0)
         
         if max_len is None:
@@ -39,7 +36,7 @@ class Seq2Seq(nn.Module):
         
         src_mask = (src != self.pad_token_id).sum(dim=1)
         
-        encoder_outputs, hidden = self.encoder(src, src_mask)
+        _, hidden = self.encoder(src, src_mask)
         
         decoder_input = torch.full(
             (batch_size, 1),
@@ -48,18 +45,14 @@ class Seq2Seq(nn.Module):
         )
         
         decoder_outputs = []
-        attentions = []
         
         for t in range(max_len):
-            decoder_output, hidden, attention = self.decoder(
+            decoder_output, hidden = self.decoder(
                 decoder_input,
-                hidden,
-                encoder_outputs
+                hidden
             )
             
             decoder_outputs.append(decoder_output)
-            if attention is not None:
-                attentions.append(attention)
             
             if tgt is not None and random.random() < self.teacher_forcing_ratio:
                 decoder_input = tgt[:, t:t+1]
@@ -67,7 +60,6 @@ class Seq2Seq(nn.Module):
                 decoder_input = decoder_output.argmax(2)
 
         decoder_outputs = torch.cat(decoder_outputs, dim=1)
-        attentions = torch.cat(attentions, dim=1) if attentions else None
         
         return decoder_outputs
 
@@ -77,28 +69,23 @@ class Seq2Seq(nn.Module):
         src: torch.Tensor,
         max_len: int = 100,
         temperature: float = 1.0
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        
+    ) -> torch.Tensor:
         batch_size = src.size(0)
         
-        
-        encoder_outputs, hidden = self.encoder(src)
-        
+        _, hidden = self.encoder(src)
         
         decoder_input = torch.full(
             (batch_size, 1),
-            self.decoder.embedding.num_embeddings - 2,  # <BOS> 
+            self.decoder.embedding.num_embeddings - 2,  # <BOS>
             device=src.device
         )
         
         predictions = []
-        attention_weights = []
         
         for _ in range(max_len):
-            decoder_output, hidden, attention = self.decoder(
+            decoder_output, hidden = self.decoder(
                 decoder_input,
-                hidden,
-                encoder_outputs
+                hidden
             )
             
             if temperature != 1.0:
@@ -109,18 +96,14 @@ class Seq2Seq(nn.Module):
                 tau=temperature,
                 hard=True
             )
-            
             predictions.append(prediction)
-            if attention is not None:
-                attention_weights.append(attention)
             
             decoder_input = prediction.argmax(2)
             
-            # Stop if  EOS token
+            # Stop if all sequences if EOS
             if (decoder_input == self.decoder.embedding.num_embeddings - 1).all():
                 break
         
         predictions = torch.cat(predictions, dim=1)
-        attention_weights = torch.cat(attention_weights, dim=1) if attention_weights else None
         
-        return predictions, attention_weights
+        return predictions

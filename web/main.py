@@ -19,7 +19,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 
 models: Dict[str, torch.nn.Module] = {}
-tokenizer: Optional[TranslationTokenizer] = None
+tokenizers: dict[str, TranslationTokenizer] = {}
 web_config: Optional[dict] = None
 
 
@@ -46,27 +46,33 @@ def load_model_config(model_name: str):
         return cfg
 
 def load_models():
-    global models, tokenizer, web_config
+    global models, tokenizers, web_config
     
     device = get_device("auto")
     print(f"Using device: {device}")
     
-    tokenizer = TranslationTokenizer(
-        name="facebook/wmt19-ru-en",
-        max_length=128
-    )
-    
     for model_id, model_cfg in web_config.models.items():
         # try:
-            # Load model config using Hydra
+            
             model_config = load_model_config(model_cfg.name)
             print(f"Loaded config for model {model_id}")
             print(model_config)
             
-            model_config.model.vocab_size = tokenizer.vocab_size
-            model_config.model.pad_token_id = tokenizer.pad_token_id
+            try:
+                max_length = model_config.model.model_info.max_seq_length
+            except:
+                max_length = 128
+            print(max_length)
+            tokenizer = TranslationTokenizer(
+                name="facebook/wmt19-ru-en",
+                max_length=max_length
+            )
+            tokenizers[model_id] = tokenizer
+            model_config.model.vocab_size = tokenizers[model_id].vocab_size
+            model_config.model.pad_token_id = tokenizers[model_id].pad_token_id
+        
             
-            model = hydra.utils.instantiate(model_config.model.seq2seq).to(device)
+            model = hydra.utils.instantiate(model_config.model.model_info).to(device)
             
             checkpoint_dir = Path("checkpoints") / model_cfg.checkpoint_dir
             checkpoints = list(checkpoint_dir.glob("best_model*.pt"))
@@ -124,13 +130,14 @@ async def translate(request: TranslationRequest):
             detail=f"Text too long. Maximum length for this model is {model_cfg.max_length} words"
         )
     
-    inputs = tokenizer.encode(
+    inputs = tokenizers[request.model_id].encode(
         request.text,
         return_tensors="pt"
     )["input_ids"].to(next(models[request.model_id].parameters()).device)
-    
+    print(inputs.size())
+    print(inputs)
     with torch.no_grad():
         token_indices = models[request.model_id].translate(inputs)
-        translated_text = tokenizer.decode(token_indices[0], skip_special_tokens=True)
+        translated_text = tokenizers[request.model_id].decode(token_indices[0], skip_special_tokens=True)
     
     return {"translation": translated_text}
