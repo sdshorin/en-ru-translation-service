@@ -105,13 +105,18 @@ def main(config: DictConfig):
     
     config.model.pad_token_id = tokenizer.pad_token_id
     config.model.vocab_size = tokenizer.vocab_size
+    print("vocab_size: ", tokenizer.vocab_size)
     
     initialize_wandb(config)
     
-    model = instantiate(config.model.model_info).to(device)
+    model = instantiate(config.model.model_info)
+    model.set_tokenizer(tokenizer)
+    model.to(device)
+    
     log.info(f"Created model: {model.__class__.__name__}")
     
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id,
+                                          label_smoothing=0.1)
     optimizer = instantiate(config.training.optimizer, params=model.parameters())
     
     scheduler = None

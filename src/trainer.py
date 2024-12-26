@@ -44,12 +44,13 @@ class Trainer:
     def train(self) -> None:
         for epoch in range(self.config.training.num_epochs):
             log.info(f"\nEpoch {epoch + 1}/{self.config.training.num_epochs}")
-            
+            self.model.training_progress = epoch / (self.config.training.num_epochs - 1)
             train_metrics = self.train_epoch()
             val_metrics = self.validate()
             
             metrics = {**train_metrics, **val_metrics}
             self._log_metrics(metrics)
+            self.show_translation_examples()
             
             if self._should_save_checkpoint(val_metrics['val_loss']):
                 self._save_checkpoint(epoch, val_metrics['val_loss'])
@@ -97,6 +98,40 @@ class Trainer:
                 progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
         
         return {"val_loss": total_loss / len(self.val_loader)}
+
+    def show_translation_examples(self, num_examples: int = 5) -> None:
+        self.model.eval()
+        log.info("\nTranslation Examples:")
+        
+        with torch.no_grad():
+            for i, (src, tgt) in enumerate(self.val_loader):
+                if i >= num_examples:
+                    break
+                    
+                src = src.to(self.device)
+                src_text = self.val_loader.dataset.tokenizer.decode(
+                    src[0], skip_special_tokens=True
+                )
+                
+                tgt_text = self.val_loader.dataset.tokenizer.decode(
+                    tgt[0], skip_special_tokens=True
+                )
+                
+                output = self.model.translate(
+                    src,
+                    max_len=self.config.data.tokenizer.max_length
+                )
+                pred_text = self.val_loader.dataset.tokenizer.decode(
+                    output[0], skip_special_tokens=True
+                )
+                
+                log.info(f"\nExample {i+1}:")
+                log.info(f"target tokens : {tgt[0]}")
+                log.info(f"pred tokens   : {output[0]}")
+                log.info(f"Source        : {src_text}")
+                log.info(f"Prediction    : {pred_text}")
+                log.info(f"Reference     : {tgt_text}")
+
 
     def _training_step(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
         self.optimizer.zero_grad()

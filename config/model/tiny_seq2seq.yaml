@@ -5,9 +5,10 @@ vocab_size: null
 
 model_info:
   _target_: src.models.tiny_seq2seq.TinySeq2Seq
-  vocab_size: ${model.vocab_size}  # Will be set from tokenizer
   embedding_dim: 64
   hidden_dim: 128
+  # vocab_size: ${model.vocab_size}  # Will be set from tokenizer
+  # pad_token_id: ${model.pad_token_id}
 
 encoder:
   vocab_size: ${model.vocab_size}
