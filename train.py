@@ -103,8 +103,8 @@ def main(config: DictConfig):
     log.info(f"Training samples: {len(train_loader.dataset)}")
     log.info(f"Validation samples: {len(val_loader.dataset)}")
     
-    config.model.pad_token_id = tokenizer.pad_token_id
-    config.model.vocab_size = tokenizer.vocab_size
+    # config.model.pad_token_id = tokenizer.pad_token_id
+    # config.model.vocab_size = tokenizer.vocab_size
     print("vocab_size: ", tokenizer.vocab_size)
     
     initialize_wandb(config)
@@ -112,7 +112,7 @@ def main(config: DictConfig):
     model = instantiate(config.model.model_info)
     model.set_tokenizer(tokenizer)
     model.to(device)
-    
+
     log.info(f"Created model: {model.__class__.__name__}")
     
     criterion = torch.nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id,
@@ -120,18 +120,21 @@ def main(config: DictConfig):
     optimizer = instantiate(config.training.optimizer, params=model.parameters())
     
     scheduler = None
-    scheduler_steps_parameter = {config.training.scheduler_steps_parameter : len(train_loader) * config.training.num_epochs}
-    print(scheduler_steps_parameter)
+    scheduler_parameters = {config.training.scheduler_steps_parameter : len(train_loader) * config.training.num_epochs}
+    if config.training.scheduler_warmup_parameter:
+        scheduler_parameters[config.training.scheduler_warmup_parameter] = int(len(train_loader) * config.training.num_epochs * 0.1)
     
+    _debug_params = {
+        "param":config.training.scheduler,
+        "opt": optimizer,
+        **scheduler_parameters,
+    }
+    print(f"scheduler_parameters: {_debug_params}")
     if "scheduler" in config.training:
         scheduler = instantiate(
             config.training.scheduler,
             optimizer=optimizer,
-            **scheduler_steps_parameter,
-            # optimizer=optimizer,
-            # total_steps=len(train_loader) * config.training.num_epochs
-            # num_training_steps=
-            
+            **scheduler_parameters,
         )
     
     trainer = Trainer(

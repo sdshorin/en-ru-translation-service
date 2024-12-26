@@ -7,8 +7,9 @@ class TinySeq2Seq(nn.Module):
         self, 
         embedding_dim: int,
         hidden_dim: int,
+        num_layers: int,
         min_teacher_forcing_ratio: float = 0.2,
-        max_teacher_forcing_ratio: float = 0.9,
+        max_teacher_forcing_ratio: float = 1.2,
     ):
         super().__init__()
         
@@ -22,14 +23,14 @@ class TinySeq2Seq(nn.Module):
         self.encoder = nn.LSTM(
             embedding_dim,
             hidden_dim,
-            num_layers=4,
+            num_layers=num_layers,
             batch_first=True
         )
         
         self.decoder = nn.LSTM(
             embedding_dim,
             hidden_dim,
-            num_layers=4,
+            num_layers=num_layers,
             batch_first=True
         )
     
@@ -47,7 +48,6 @@ class TinySeq2Seq(nn.Module):
 
     def forward(self, src, tgt=None, max_len=None):
         batch_size = src.size(0)
-        
         if max_len is None:
             max_len = tgt.size(1) if tgt is not None else src.size(1) + 10
             

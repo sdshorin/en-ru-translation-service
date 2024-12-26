@@ -11,9 +11,10 @@ optimizer:
 
 
 scheduler_steps_parameter: total_steps
+scheduler_warmup_parameter: Null
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
-  max_lr: 0.005
+  max_lr: 0.003
   pct_start: 0.3
   anneal_strategy: "cos"
   cycle_momentum: true

@@ -4,15 +4,15 @@ accumulate_grad_batches: 2
 
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 0.0001
+  lr:  0.0003
   weight_decay: 0.01
   eps: 1e-8
   betas: [0.9, 0.98]
 
 scheduler_steps_parameter: num_training_steps
+scheduler_warmup_parameter: num_warmup_steps
 scheduler:
   _target_: transformers.get_linear_schedule_with_warmup
-  num_warmup_steps: 4000
   
 
 # criterion:

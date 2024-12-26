@@ -4,35 +4,32 @@ import torch
 import torch.nn as nn
 from torch.nn import TransformerEncoder, TransformerDecoder
 from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
-from transformers import AutoTokenizer
 
 
 class Transformer(nn.Module):
     def __init__(
         self,
-        vocab_size: int,
+        max_seq_length: int,
         d_model: int = 256,
         nhead: int = 4,
         num_encoder_layers: int = 4,
         num_decoder_layers: int = 4,
         dim_feedforward: int = 1024,
         dropout: float = 0.1,
-        max_seq_length: int = 64,
-        tokenizer_name:str= ""
+        min_teacher_forcing_ratio: float = 0.2,
+        max_teacher_forcing_ratio: float = 1.2,
     ):
         super().__init__()
-        
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_name
-        )
-        self.bos_id = tokenizer.bos_token_id
-        self.eos_id = tokenizer.eos_token_id
-        self.pad_id = tokenizer.pad_token_id
+
+        self.min_teacher_forcing_ratio = min_teacher_forcing_ratio
+        self.max_teacher_forcing_ratio = max_teacher_forcing_ratio
+
 
         self.d_model = d_model
         self.max_seq_length = max_seq_length
         
-        self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=self.pad_id)
+        self.training_progress = 0
+        
         self.pos_encoder = PositionalEncoding(d_model, max_seq_length, dropout)
         
         encoder_layer = TransformerEncoderLayer(
@@ -65,16 +62,30 @@ class Transformer(nn.Module):
             norm=decoder_norm
         )
         
-        self.output_layer = nn.Linear(d_model, vocab_size)
+        
         self._reset_parameters()
+
+    def set_tokenizer(self, tokenizer):
+        self.tokenizer = tokenizer
+        self.embedding = nn.Embedding(tokenizer.vocab_size, self.d_model, padding_idx=tokenizer.pad_token_id)
+        self.output_layer = nn.Linear(self.d_model, tokenizer.vocab_size)
+        
+
 
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
+    def get_teacher_forcing_ratio(self):
+        ratio = self.max_teacher_forcing_ratio - (
+            (self.max_teacher_forcing_ratio - self.min_teacher_forcing_ratio) * 
+            (self.training_progress)
+        )
+        return ratio
+
     def create_padding_mask(self, src):
-        return src == self.pad_id
+        return src == self.tokenizer.pad_token_id
 
     def create_causal_mask(self, size):
         mask = torch.triu(torch.ones(size, size), diagonal=1).bool()
@@ -86,35 +97,50 @@ class Transformer(nn.Module):
         tgt: torch.Tensor,
         src_key_padding_mask: torch.Tensor = None,
         tgt_key_padding_mask: torch.Tensor = None,
+        teacher_forcing: bool = True
     ) -> torch.Tensor:
         
         if src_key_padding_mask is None:
             src_key_padding_mask = self.create_padding_mask(src)
         if tgt_key_padding_mask is None:
             tgt_key_padding_mask = self.create_padding_mask(tgt)
+
+        device = src.device
+        batch_size = src.size(0)
         
-        tgt_mask = self.create_causal_mask(tgt.size(1)).to(tgt.device)
+        src_embedded = self.embedding(src) * math.sqrt(self.d_model)
+        src_embedded = self.pos_encoder(src_embedded)
+        memory = self.encoder(src_embedded, src_key_padding_mask=src_key_padding_mask)
+
+        decoder_input = torch.full((batch_size, 1), self.tokenizer.bos_token_id, device=device)
+        outputs = []
+
+        for i in range(tgt.size(1)):
+            tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
+            tgt_padding_mask = self.create_padding_mask(decoder_input)
+            
+            tgt_embedded = self.embedding(decoder_input) * math.sqrt(self.d_model)
+            tgt_embedded = self.pos_encoder(tgt_embedded)
+
+            decoder_output = self.decoder(
+                tgt_embedded,
+                memory,
+                tgt_mask=tgt_mask,
+                tgt_key_padding_mask=tgt_padding_mask,
+                memory_key_padding_mask=src_key_padding_mask
+            )
+            
+            output = self.output_layer(decoder_output[:, -1:, :])
+            outputs.append(output)
+            
+            if teacher_forcing and torch.rand(1).item() < self.get_teacher_forcing_ratio():
+                next_token = tgt[:, i+1:i+2]
+            else:
+                next_token = output.argmax(-1)
+            
+            decoder_input = torch.cat([decoder_input, next_token], dim=1)
         
-        src = self.embedding(src) * torch.sqrt(torch.tensor(self.d_model, dtype=torch.float))
-        tgt = self.embedding(tgt) * torch.sqrt(torch.tensor(self.d_model, dtype=torch.float))
-        
-        src = self.pos_encoder(src)
-        tgt = self.pos_encoder(tgt)
-        memory = self.encoder(
-            src,
-            src_key_padding_mask=src_key_padding_mask
-        )
-        output = self.decoder(
-            tgt,
-            memory,
-            tgt_mask=tgt_mask,
-            tgt_key_padding_mask=tgt_key_padding_mask,
-            memory_key_padding_mask=src_key_padding_mask
-        )
-        
-        output = self.output_layer(output)
-        
-        return output
+        return torch.cat(outputs, dim=1)
 
     @torch.no_grad()
     def translate(
@@ -133,7 +159,7 @@ class Transformer(nn.Module):
         src_embedded = self.pos_encoder(src_embedded)
         memory = self.encoder(src_embedded, src_key_padding_mask=src_padding_mask)
         
-        decoder_input = torch.tensor([[self.bos_id]], device=device)
+        decoder_input = torch.tensor([[self.tokenizer.bos_token_id]], device=device)
         
         for _ in range(self.max_seq_length):
             tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
@@ -163,7 +189,7 @@ class Transformer(nn.Module):
             probs = torch.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
             
-            if next_token.item() == self.eos_id:
+            if next_token.item() == self.tokenizer.eos_token_id:
                 break
             
             decoder_input = torch.cat([decoder_input, next_token], dim=1)
