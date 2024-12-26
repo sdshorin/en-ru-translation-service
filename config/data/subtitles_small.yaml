@@ -1,6 +1,6 @@
 tokenizer:
   _target_: src.data.tokenizer.TranslationTokenizer
-  name: "facebook/wmt19-ru-en"
+  name: "cointegrated/LaBSE-en-ru"
   max_length: 32
   padding: "max_length"
   truncation: true

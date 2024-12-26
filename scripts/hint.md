@@ -21,7 +21,7 @@ chmod +x *.sh
 ./scripts/upload_project.sh
 ./scripts/setup_env.sh
 ./scripts/upload_dataset.sh
-./scripts/train_model.sh cnn_v2_minimal
+./scripts/train_model.sh  model=transformer training=transformer
 ./scripts/check_training.sh training_X_Y
-./scripts/download_models.sh cnn_v2
+./scripts/download_models.sh transformer
 ```

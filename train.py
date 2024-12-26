@@ -25,10 +25,57 @@ def initialize_wandb(config: DictConfig) -> None:
             mode=config.wandb.mode,
         )
 
+
+def test_tokenizer(dataset, tokenizer, num_samples=5):
+    log.info("Testing tokenizer functionality...")
+    
+    test_samples = []
+    for idx in range(min(num_samples, len(dataset.dataset))):
+        item = dataset.dataset[idx]
+        source_text = item["translation"][dataset.source_col]
+        target_text = item["translation"][dataset.target_col]
+        test_samples.append((source_text, target_text))
+    
+    all_tests_passed = True
+    
+    for lang_idx, lang_name in [(0, "source"), (1, "target")]:
+        for idx, (source, target) in enumerate(test_samples):
+            original_text = source if lang_idx == 0 else target
+            encoded = tokenizer.encode(
+                original_text,
+                add_special_tokens=True,
+                return_tensors="pt"
+            )
+            decoded_text = tokenizer.decode(
+                encoded["input_ids"].squeeze(),
+                skip_special_tokens=True
+            )
+
+            original_normalized = "".join(original_text.split()).strip()
+            decoded_normalized = "".join(decoded_text.split()).strip()
+            
+            original_readable = " ".join(original_text.split()).strip()
+            decoded_readable = " ".join(decoded_text.split()).strip()
+            if original_normalized != decoded_normalized:
+                all_tests_passed = False
+                log.error(f"Test failed for {lang_name} language, sample {idx}:")
+                log.error(f"Original : {original_readable}")
+                log.error(f"Decoded  : {decoded_readable}")
+                log.error("Token IDs: " + str(encoded["input_ids"].squeeze().tolist()))
+    
+    if all_tests_passed:
+        log.info("All tokenizer tests passed")
+    
+    return all_tests_passed
+
+
 def create_dataloaders(config: DictConfig) -> Tuple[DataLoader, DataLoader, PreTrainedTokenizer]:
     tokenizer = instantiate(config.data.tokenizer)
     
     dataset = instantiate(config.data.dataset, tokenizer=tokenizer)
+    if not test_tokenizer(dataset, tokenizer):
+        raise ValueError("Tokenizer tests failed! Please check the logs above.")
+
     train_dataset, val_dataset = dataset.split_train_val()
     
     train_loader = DataLoader(

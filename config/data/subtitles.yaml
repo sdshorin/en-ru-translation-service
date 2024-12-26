@@ -1,6 +1,6 @@
 tokenizer:
   _target_: src.data.tokenizer.TranslationTokenizer
-  name: "facebook/wmt19-ru-en"
+  name: "cointegrated/LaBSE-en-ru"
   max_length: 64
   padding: "max_length"
   truncation: true
@@ -11,10 +11,10 @@ dataset:
   lang1: "en"
   lang2: "ru"
   max_length: ${data.tokenizer.max_length}
-  train_size: 5000000
+  train_size: 200_000
 
 dataloader:
-  batch_size: 256
+  batch_size: 64
   num_workers: 4
   pin_memory: true
   shuffle: true
