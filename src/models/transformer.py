@@ -23,12 +23,10 @@ class Transformer(nn.Module):
 
         self.min_teacher_forcing_ratio = min_teacher_forcing_ratio
         self.max_teacher_forcing_ratio = max_teacher_forcing_ratio
-
-
         self.d_model = d_model
         self.max_seq_length = max_seq_length
         
-        self.training_progress = 0
+        self.training_progress = 0.0
         
         self.pos_encoder = PositionalEncoding(d_model, max_seq_length, dropout)
         
@@ -62,16 +60,14 @@ class Transformer(nn.Module):
             norm=decoder_norm
         )
         
-        
         self._reset_parameters()
 
     def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer
         self.embedding = nn.Embedding(tokenizer.vocab_size, self.d_model, padding_idx=tokenizer.pad_token_id)
         self.output_layer = nn.Linear(self.d_model, tokenizer.vocab_size)
-        
 
-
+    
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
@@ -80,7 +76,7 @@ class Transformer(nn.Module):
     def get_teacher_forcing_ratio(self):
         ratio = self.max_teacher_forcing_ratio - (
             (self.max_teacher_forcing_ratio - self.min_teacher_forcing_ratio) * 
-            (self.training_progress)
+            self.training_progress
         )
         return ratio
 
@@ -99,7 +95,6 @@ class Transformer(nn.Module):
         tgt_key_padding_mask: torch.Tensor = None,
         teacher_forcing: bool = True
     ) -> torch.Tensor:
-        
         if src_key_padding_mask is None:
             src_key_padding_mask = self.create_padding_mask(src)
         if tgt_key_padding_mask is None:
@@ -107,6 +102,7 @@ class Transformer(nn.Module):
 
         device = src.device
         batch_size = src.size(0)
+        tgt_seq_len = tgt.size(1)
         
         src_embedded = self.embedding(src) * math.sqrt(self.d_model)
         src_embedded = self.pos_encoder(src_embedded)
@@ -115,7 +111,9 @@ class Transformer(nn.Module):
         decoder_input = torch.full((batch_size, 1), self.tokenizer.bos_token_id, device=device)
         outputs = []
 
-        for i in range(tgt.size(1)):
+        use_teacher_forcing = teacher_forcing and torch.rand(1).item() < self.get_teacher_forcing_ratio()
+
+        for i in range(tgt_seq_len):
             tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
             tgt_padding_mask = self.create_padding_mask(decoder_input)
             
@@ -133,12 +131,13 @@ class Transformer(nn.Module):
             output = self.output_layer(decoder_output[:, -1:, :])
             outputs.append(output)
             
-            if teacher_forcing and torch.rand(1).item() < self.get_teacher_forcing_ratio():
-                next_token = tgt[:, i+1:i+2]
-            else:
-                next_token = output.argmax(-1)
-            
-            decoder_input = torch.cat([decoder_input, next_token], dim=1)
+            if i < tgt_seq_len - 1:
+                if use_teacher_forcing:
+                    next_token = tgt[:, i+1:i+2]
+                else:
+                    next_token = output.argmax(dim=-1)
+                
+                decoder_input = torch.cat([decoder_input, next_token], dim=1)
         
         return torch.cat(outputs, dim=1)
 
@@ -146,22 +145,25 @@ class Transformer(nn.Module):
     def translate(
         self,
         src: torch.Tensor,
+        max_length: int = None,
         temperature: float = 0.8,
         top_k: int = 50,
     ) -> torch.Tensor:
         assert src.size(0) == 1
+        
+        if max_length is None:
+            max_length = self.max_seq_length
 
         device = src.device
         
         src_padding_mask = self.create_padding_mask(src)
-        
         src_embedded = self.embedding(src) * math.sqrt(self.d_model)
         src_embedded = self.pos_encoder(src_embedded)
         memory = self.encoder(src_embedded, src_key_padding_mask=src_padding_mask)
         
         decoder_input = torch.tensor([[self.tokenizer.bos_token_id]], device=device)
         
-        for _ in range(self.max_seq_length):
+        for _ in range(max_length):
             tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
             tgt_padding_mask = self.create_padding_mask(decoder_input)
             
@@ -177,7 +179,6 @@ class Transformer(nn.Module):
             )
 
             output = self.output_layer(decoder_output[:, -1:, :])
-            
             logits = output.squeeze(1) / temperature
         
             if top_k > 0:
