@@ -1,4 +1,4 @@
-num_epochs: 50
+num_epochs: 5
 gradient_clip_val: 1.0
 accumulate_grad_batches: 2
 

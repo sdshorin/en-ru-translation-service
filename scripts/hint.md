@@ -20,8 +20,9 @@ chmod +x *.sh
 ./scripts/setup_ssh.sh
 ./scripts/upload_project.sh
 ./scripts/setup_env.sh
-./scripts/upload_dataset.sh
+# ./scripts/upload_dataset.sh
 ./scripts/train_model.sh  model=transformer training=transformer
 ./scripts/check_training.sh training_X_Y
+./scripts/stop_training.sh training_X_Y
 ./scripts/download_models.sh transformer
 ```

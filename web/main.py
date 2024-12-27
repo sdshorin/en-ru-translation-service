@@ -64,15 +64,18 @@ def load_models():
                 max_length = 128
             print(max_length)
             tokenizer = TranslationTokenizer(
-                name="facebook/wmt19-ru-en",
+                name="cointegrated/LaBSE-en-ru",
                 max_length=max_length
             )
             tokenizers[model_id] = tokenizer
-            model_config.model.vocab_size = tokenizers[model_id].vocab_size
-            model_config.model.pad_token_id = tokenizers[model_id].pad_token_id
+            # model_config.model.vocab_size = tokenizers[model_id].vocab_size
+            # model_config.model.pad_token_id = tokenizers[model_id].pad_token_id
         
             
-            model = hydra.utils.instantiate(model_config.model.model_info).to(device)
+            model = hydra.utils.instantiate(model_config.model.model_info)
+            model.set_tokenizer(tokenizer)
+            model.to(device)
+            
             
             checkpoint_dir = Path("checkpoints") / model_cfg.checkpoint_dir
             checkpoints = list(checkpoint_dir.glob("best_model*.pt"))
@@ -137,7 +140,8 @@ async def translate(request: TranslationRequest):
     print(inputs.size())
     print(inputs)
     with torch.no_grad():
-        token_indices = models[request.model_id].translate(inputs)
+        
+        token_indices = models[request.model_id].translate(inputs.unsqueeze(0))
         translated_text = tokenizers[request.model_id].decode(token_indices[0], skip_special_tokens=True)
     
     return {"translation": translated_text}

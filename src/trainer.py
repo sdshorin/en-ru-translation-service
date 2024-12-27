@@ -99,38 +99,43 @@ class Trainer:
         
         return {"val_loss": total_loss / len(self.val_loader)}
 
-    def show_translation_examples(self, num_examples: int = 5) -> None:
+    def show_translation_examples(self, examples_to_show: int = 5) -> None:
         self.model.eval()
         log.info("\nTranslation Examples:")
-        
         with torch.no_grad():
-            for i, (src, tgt) in enumerate(self.val_loader):
-                if i >= num_examples:
+            for i, (src_batch, tgt_batch) in enumerate(self.val_loader):
+                if examples_to_show <= 0:
                     break
+                for src, tgt in zip(src_batch, tgt_batch):
+                    if examples_to_show <= 0:
+                        break
+
+                    examples_to_show -= 1
+                    src = src.to(self.device)
+                    src_text = self.val_loader.dataset.tokenizer.decode(
+                        src, skip_special_tokens=True
+                    )
                     
-                src = src.to(self.device)
-                src_text = self.val_loader.dataset.tokenizer.decode(
-                    src[0], skip_special_tokens=True
-                )
-                
-                tgt_text = self.val_loader.dataset.tokenizer.decode(
-                    tgt[0], skip_special_tokens=True
-                )
-                
-                output = self.model.translate(
-                    src,
-                    max_len=self.config.data.tokenizer.max_length
-                )
-                pred_text = self.val_loader.dataset.tokenizer.decode(
-                    output[0], skip_special_tokens=True
-                )
-                
-                log.info(f"\nExample {i+1}:")
-                log.info(f"target tokens : {tgt[0]}")
-                log.info(f"pred tokens   : {output[0]}")
-                log.info(f"Source        : {src_text}")
-                log.info(f"Prediction    : {pred_text}")
-                log.info(f"Reference     : {tgt_text}")
+                    tgt_text = self.val_loader.dataset.tokenizer.decode(
+                        tgt, skip_special_tokens=True
+                    )
+                    
+                    output = self.model.translate(
+                        src.unsqueeze(0),
+                        max_len=self.config.data.tokenizer.max_length
+                    )
+                    output = output.squeeze(0)
+                                           
+                    pred_text = self.val_loader.dataset.tokenizer.decode(
+                        output, skip_special_tokens=True
+                    )
+                    
+                    log.info(f"\nExample {i+1}:")
+                    log.info(f"target tokens : {tgt}")
+                    log.info(f"pred tokens   : {output}")
+                    log.info(f"Source        : {src_text}")
+                    log.info(f"Prediction    : {pred_text}")
+                    log.info(f"Reference     : {tgt_text}")
 
 
     def _training_step(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:

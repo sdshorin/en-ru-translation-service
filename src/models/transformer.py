@@ -4,29 +4,26 @@ import torch
 import torch.nn as nn
 from torch.nn import TransformerEncoder, TransformerDecoder
 from torch.nn import TransformerEncoderLayer, TransformerDecoderLayer
+from transformers import AutoTokenizer
 
 
 class Transformer(nn.Module):
     def __init__(
         self,
-        max_seq_length: int,
         d_model: int = 256,
         nhead: int = 4,
         num_encoder_layers: int = 4,
         num_decoder_layers: int = 4,
         dim_feedforward: int = 1024,
         dropout: float = 0.1,
-        min_teacher_forcing_ratio: float = 0.2,
-        max_teacher_forcing_ratio: float = 1.2,
+        max_seq_length: int = 64,
+        # min_teacher_forcing_ratio: float = 0.2,
+        # max_teacher_forcing_ratio: float = 1.2,
     ):
         super().__init__()
-
-        self.min_teacher_forcing_ratio = min_teacher_forcing_ratio
-        self.max_teacher_forcing_ratio = max_teacher_forcing_ratio
+        
         self.d_model = d_model
         self.max_seq_length = max_seq_length
-        
-        self.training_progress = 0.0
         
         self.pos_encoder = PositionalEncoding(d_model, max_seq_length, dropout)
         
@@ -64,7 +61,7 @@ class Transformer(nn.Module):
 
     def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer
-        self.embedding = nn.Embedding(tokenizer.vocab_size, self.d_model, padding_idx=tokenizer.pad_token_id)
+        self.embedding = nn.Embedding(tokenizer.vocab_size, self.d_model, padding_idx=tokenizer.tokenizer.pad_token_id)
         self.output_layer = nn.Linear(self.d_model, tokenizer.vocab_size)
 
     
@@ -73,15 +70,8 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def get_teacher_forcing_ratio(self):
-        ratio = self.max_teacher_forcing_ratio - (
-            (self.max_teacher_forcing_ratio - self.min_teacher_forcing_ratio) * 
-            self.training_progress
-        )
-        return ratio
-
     def create_padding_mask(self, src):
-        return src == self.tokenizer.pad_token_id
+        return src == self.tokenizer.tokenizer.pad_token_id
 
     def create_causal_mask(self, size):
         mask = torch.triu(torch.ones(size, size), diagonal=1).bool()
@@ -128,12 +118,12 @@ class Transformer(nn.Module):
     def translate(
         self,
         src: torch.Tensor,
-        max_len: int = 64,
+        max_len: int = None,
         temperature: float = 0.8,
         top_k: int = 50,
     ) -> torch.Tensor:
         assert src.size(0) == 1
-        
+
         if max_len is None:
             max_len = self.max_seq_length
 
@@ -144,7 +134,7 @@ class Transformer(nn.Module):
         src_embedded = self.pos_encoder(src_embedded)
         memory = self.encoder(src_embedded, src_key_padding_mask=src_padding_mask)
         
-        decoder_input = torch.tensor([[self.tokenizer.bos_token_id]], device=device)
+        decoder_input = torch.tensor([[self.tokenizer.tokenizer.bos_token_id]], device=device)
         
         for _ in range(max_len):
             tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
@@ -173,7 +163,7 @@ class Transformer(nn.Module):
             probs = torch.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
             
-            if next_token.item() == self.tokenizer.eos_token_id:
+            if next_token.item() == self.tokenizer.tokenizer.eos_token_id:
                 break
             
             decoder_input = torch.cat([decoder_input, next_token], dim=1)
