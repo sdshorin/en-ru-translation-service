@@ -101,5 +101,5 @@ class TranslationDataset(Dataset):
         return train_dataset, val_dataset
 
     def get_vocab_size(self) -> int:
-        return self.tokenizer.vocab_size
+        return len(self.tokenizer)
 

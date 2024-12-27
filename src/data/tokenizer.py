@@ -58,7 +58,7 @@ class TranslationTokenizer:
 
     @property
     def vocab_size(self) -> int:
-        return self.tokenizer.vocab_size
+        return len(self.tokenizer)
 
     def encode(
         self,
