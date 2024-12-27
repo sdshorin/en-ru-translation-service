@@ -93,53 +93,36 @@ class Transformer(nn.Module):
         tgt: torch.Tensor,
         src_key_padding_mask: torch.Tensor = None,
         tgt_key_padding_mask: torch.Tensor = None,
-        teacher_forcing: bool = True
     ) -> torch.Tensor:
+        
         if src_key_padding_mask is None:
             src_key_padding_mask = self.create_padding_mask(src)
         if tgt_key_padding_mask is None:
             tgt_key_padding_mask = self.create_padding_mask(tgt)
-
-        device = src.device
-        batch_size = src.size(0)
-        tgt_seq_len = tgt.size(1)
         
-        src_embedded = self.embedding(src) * math.sqrt(self.d_model)
-        src_embedded = self.pos_encoder(src_embedded)
-        memory = self.encoder(src_embedded, src_key_padding_mask=src_key_padding_mask)
-
-        decoder_input = torch.full((batch_size, 1), self.tokenizer.bos_token_id, device=device)
-        outputs = []
-
-        use_teacher_forcing = teacher_forcing and torch.rand(1).item() < self.get_teacher_forcing_ratio()
-
-        for i in range(tgt_seq_len):
-            tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
-            tgt_padding_mask = self.create_padding_mask(decoder_input)
-            
-            tgt_embedded = self.embedding(decoder_input) * math.sqrt(self.d_model)
-            tgt_embedded = self.pos_encoder(tgt_embedded)
-
-            decoder_output = self.decoder(
-                tgt_embedded,
-                memory,
-                tgt_mask=tgt_mask,
-                tgt_key_padding_mask=tgt_padding_mask,
-                memory_key_padding_mask=src_key_padding_mask
-            )
-            
-            output = self.output_layer(decoder_output[:, -1:, :])
-            outputs.append(output)
-            
-            if i < tgt_seq_len - 1:
-                if use_teacher_forcing:
-                    next_token = tgt[:, i+1:i+2]
-                else:
-                    next_token = output.argmax(dim=-1)
-                
-                decoder_input = torch.cat([decoder_input, next_token], dim=1)
+        tgt_mask = self.create_causal_mask(tgt.size(1)).to(tgt.device)
         
-        return torch.cat(outputs, dim=1)
+        src = self.embedding(src) * torch.sqrt(torch.tensor(self.d_model, dtype=torch.float))
+        tgt = self.embedding(tgt) * torch.sqrt(torch.tensor(self.d_model, dtype=torch.float))
+        
+        src = self.pos_encoder(src)
+        tgt = self.pos_encoder(tgt)
+        memory = self.encoder(
+            src,
+            src_key_padding_mask=src_key_padding_mask
+        )
+        output = self.decoder(
+            tgt,
+            memory,
+            tgt_mask=tgt_mask,
+            tgt_key_padding_mask=tgt_key_padding_mask,
+            memory_key_padding_mask=src_key_padding_mask
+        )
+        
+        output = self.output_layer(output)
+        
+        return output
+
 
     @torch.no_grad()
     def translate(
@@ -148,6 +131,7 @@ class Transformer(nn.Module):
         max_length: int = None,
         temperature: float = 0.8,
         top_k: int = 50,
+        max_len: int = 64
     ) -> torch.Tensor:
         assert src.size(0) == 1
         
