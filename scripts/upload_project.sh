@@ -11,6 +11,7 @@ rsync -avz \
 -e "ssh -F $SSH_CONFIG" \
 --exclude 'outputs' \
 --exclude '.env' \
+--exclude 'venv' \
 --exclude '__pycache__' \
 --exclude '*.pyc' \
 --exclude '.git' \

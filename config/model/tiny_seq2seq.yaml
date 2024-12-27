@@ -1,17 +1,17 @@
 name: tiny_seq2seq
 
 pad_token_id: null
-vocab_size: null
+# vocab_size: null
 
 model_info:
   _target_: src.models.tiny_seq2seq.TinySeq2Seq
-  embedding_dim: 128
-  hidden_dim: 512
-  num_layers: 4
+  embedding_dim: 256
+  hidden_dim: 1024
+  num_layers: 6
   # vocab_size: ${model.vocab_size}  # Will be set from tokenizer
   # pad_token_id: ${model.pad_token_id}
 
-encoder:
-  vocab_size: ${model.vocab_size}
-decoder:
-  vocab_size: ${model.vocab_size}
+# encoder:
+#   vocab_size: ${model.vocab_size}
+# decoder:
+#   vocab_size: ${model.vocab_size}

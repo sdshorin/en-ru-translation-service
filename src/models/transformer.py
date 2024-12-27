@@ -128,15 +128,14 @@ class Transformer(nn.Module):
     def translate(
         self,
         src: torch.Tensor,
-        max_length: int = None,
+        max_len: int = 64,
         temperature: float = 0.8,
         top_k: int = 50,
-        max_len: int = 64
     ) -> torch.Tensor:
         assert src.size(0) == 1
         
-        if max_length is None:
-            max_length = self.max_seq_length
+        if max_len is None:
+            max_len = self.max_seq_length
 
         device = src.device
         
@@ -147,7 +146,7 @@ class Transformer(nn.Module):
         
         decoder_input = torch.tensor([[self.tokenizer.bos_token_id]], device=device)
         
-        for _ in range(max_length):
+        for _ in range(max_len):
             tgt_mask = self.create_causal_mask(decoder_input.size(1)).to(device)
             tgt_padding_mask = self.create_padding_mask(decoder_input)
             
